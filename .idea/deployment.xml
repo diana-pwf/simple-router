@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="VM (e8d1c58b-c2b0-47cb-9f61-e3d006eacf0c)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/router" local="$PROJECT_DIR$" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-vm" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+      <paths name="WSL (5950d629-7a55-428c-8b87-a50261ec33b5)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

@@ -1,0 +1,3 @@
+/router/cmake-build-debug-vm/CMakeFiles/edit_cache.dir
+/router/cmake-build-debug-vm/CMakeFiles/rebuild_cache.dir
+/router/cmake-build-debug-vm/CMakeFiles/router.dir
