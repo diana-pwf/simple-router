@@ -31,33 +31,37 @@ namespace simple_router {
 RoutingTableEntry
 RoutingTable::lookup(uint32_t ip) const
 {
-    // 最长前缀匹配算法
+    // 最长前缀匹配算法 [有问题] -- 要求匹配qwq
     // 返回匹配的路由表项
 
-    int commonPrefixMaxLen = 0;
+    int commonPrefixMaxLen = -1;
     auto *entry = new RoutingTableEntry;
     entry->ifName = "";
     for (const auto& routingEntry: m_entries)
     {
-        int result = routingEntry.dest ^ ip;
-        for(int i = 31; i >= 0; i--)
+        if ((routingEntry.dest & routingEntry.mask) == (ip & routingEntry.mask))
         {
-            if((1 << i) & result)
+            // 该路由表项与目的IP匹配 来计算匹配长度
+            uint32_t result = routingEntry.dest ^ ip;
+            for(int i = 31; i >= 0; i--)
             {
-                if(31 - i > commonPrefixMaxLen)
+                if((1 << i) & result)
                 {
-                    commonPrefixMaxLen = 31 - i;
+                    if(31 - i > commonPrefixMaxLen)
+                    {
+                        commonPrefixMaxLen = 31 - i;
+                        *entry = routingEntry;
+                    }
+                    break;
+                }
+                else if (i == 0)
+                {
                     *entry = routingEntry;
                 }
-                break;
-            }
-            else if (i == 0)
-            {
-                *entry = routingEntry;
             }
         }
     }
-    if(!entry->ifName.empty())
+    if(commonPrefixMaxLen == -1)
     {
         return *entry;
     }

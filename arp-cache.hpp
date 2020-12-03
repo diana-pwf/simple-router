@@ -84,6 +84,8 @@ const uint32_t MAX_SENT_TIME = 5;
 
 struct PendingPacket
 {
+    // 数据包必为IP类型,因为只有收到IP包而找不到转发的MAC地址才有可能放入缓存
+    // 接口为收到该数据包的路由器端口
   Buffer packet;     //< A raw Ethernet frame, presumably with the dest MAC empty
   std::string iface; //< The outgoing interface
 };
