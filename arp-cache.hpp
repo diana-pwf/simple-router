@@ -193,6 +193,8 @@ public:
   void
   clear();
 
+  void handleArpRequest(std::shared_ptr<ArpRequest>& request);
+
 private:
   /**
    * Thread which sweeps through the cache and invalidates entries that were added
@@ -214,7 +216,7 @@ private:
   friend std::ostream&
   operator<<(std::ostream& os, const ArpCache& cache);
 
-  void handleArpRequest(std::shared_ptr<ArpRequest>& request);
+
 };
 
 std::ostream&

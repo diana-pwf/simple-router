@@ -30,119 +30,73 @@ void
 SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 {
   std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << std::endl;
-
-    // 获取收到数据包的路由器的接口
+  // 获取收到数据包的路由器的接口
   const Interface* iface = findIfaceByName(inIface);
-
   if (iface == nullptr) {
     std::cerr << "Received packet, but interface is unknown, ignoring" << std::endl;
     return;
   }
 
-
-    try
-    {
-        // 检查数据包的长度是否小于以太网帧包头长度
-        if (packet.size() < sizeof(struct ethernet_hdr))
-        {
-            throw std::runtime_error("packet size is too small");
-        }
-        else
-        {
-            auto *pEthernet = (struct ethernet_hdr *)packet.data();
-
-            // 广播地址：考虑被全局共享
-            const Buffer broadcastAddr(ETHER_ADDR_LEN, 0xff);
-
-            // 应该由路由器处理的数据包：
-            // 以太网帧中的目的MAC地址为 接收端口的MAC地址 或 广播地址
-            if (!memcmp(pEthernet->ether_dhost, iface->addr.data(), ETHER_ADDR_LEN)
-            || !memcmp(pEthernet->ether_dhost, broadcastAddr.data(), ETHER_ADDR_LEN))
-            {
-                uint16_t packetType = ntohs(pEthernet->ether_type);
-
-                // 对类型是ARP或Ipv4的数据包进行处理
-                if (packetType == ethertype_ip)
-                {
-                    std::cerr << "process Ipv4" << std::endl;
-                    processIpv4Packet(packet, iface);
-                }
-                else if(packetType == ethertype_arp)
-                {
-                    std::cerr << "process Arp" << std::endl;
-                    processArpPacket(packet, iface);
-                }
-                else
-                {
-                    throw std::runtime_error("Neither ARP or IP packet received");
-                }
-                return;
-            }
-            else
-            {
-                throw std::runtime_error("Dest Mac addr is neither router interface nor broadcast");
-            }
-
-        }
-    }
-    catch (std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return;
-    }
-
-
-    // ipv4
-    // 判断长度是否合法
-    // 判断校验码
-    // 数据报的目的IP地址 是路由器的三个端口之一还是需要转发
-        // 是路由器的三个端口之一：只处理协议是ICMP的 其余丢弃 （TODO
-        // 需要转发：TTL=1 超时处理
-        // 否则在ARP缓存中寻找目的IP地址对应的MAC地址
-        // 没有就广播
-        // 有就转发 TTL减一 重新计算校验码 改变目的MAC地址和源MAC地址 发送
-
-
-  // arp
-
-  // 解析目的地址、源地址、数据类型和数据内容
-
-  // 目的地址不是相应接口的mac地址或广播地址 就丢弃
-
-
-  // FILL THIS IN
-
+  try{
+      // 检查数据包的长度是否小于以太网帧包头长度
+      if (packet.size() < sizeof(struct ethernet_hdr)){
+          throw std::runtime_error("packet size is too small");
+      }
+      else{
+          auto *pEthernet = (struct ethernet_hdr *)packet.data();
+          // 广播地址：考虑被全局共享
+          const Buffer broadcastAddr(ETHER_ADDR_LEN, 0xff);
+          // 应该由路由器处理的数据包：
+          // 以太网帧中的目的MAC地址为 接收端口的MAC地址 或 广播地址
+          if (!memcmp(pEthernet->ether_dhost, iface->addr.data(), ETHER_ADDR_LEN)
+          || !memcmp(pEthernet->ether_dhost, broadcastAddr.data(), ETHER_ADDR_LEN))
+          {
+              uint16_t packetType = ntohs(pEthernet->ether_type);
+              // 对类型是ARP或Ipv4的数据包进行处理
+              if (packetType == ethertype_ip)
+              {
+                  processIpv4Packet(packet, iface);
+              }
+              else if(packetType == ethertype_arp)
+              {
+                  processArpPacket(packet, iface);
+              }
+              else{
+                  throw std::runtime_error("Neither ARP or IP packet received");
+              }
+              return;
+          }
+          throw std::runtime_error("Dest Mac addr is neither router interface nor broadcast");
+      }
+  }
+  catch (std::exception& e) {
+      std::cerr << e.what() << std::endl;
+  }
 }
 
 void
 SimpleRouter::processArpPacket(const Buffer& packet, const Interface *iface)
 {
     // 检查ARP数据包的长度是否刚好为 以太网帧包头长度 + ARP包长度
-    if (packet.size() != sizeof(struct ethernet_hdr) + sizeof(struct arp_hdr))
-    {
+    if (packet.size() != sizeof(struct ethernet_hdr) + sizeof(struct arp_hdr)){
         throw std::runtime_error("Incorrect ARP size");
     }
-
     // 检查ARP数据包中的前四项参数是否合法
     auto *pArp = (struct arp_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
-    if (pArp->arp_hrd != htons(arp_hrd_ethernet))
-    {
+    if (pArp->arp_hrd != htons(arp_hrd_ethernet)){
         throw std::runtime_error("ARP hardware type is not ethernet");
     }
-    if (pArp->arp_pro != htons(ethertype_ip))
-    {
+    if (pArp->arp_pro != htons(ethertype_ip)){
         throw std::runtime_error("ARP protocol type is not ipv4");
     }
-    if (pArp->arp_hln != 0x06)
-    {
+    if (pArp->arp_hln != 0x06){
         throw std::runtime_error("ARP hardware address length is incorrect");
     }
-    if (pArp->arp_pln != 0x04)
-    {
+    if (pArp->arp_pln != 0x04){
         throw std::runtime_error("ARP protocol address length is incorrect");
     }
 
-    if (pArp->arp_op == htons(arp_op_request))
-    {
+    if (pArp->arp_op == htons(arp_op_request)){
         // 处理ARP请求
         // 若ARP包中的目的IP地址为接收到的端口IP 则发送ARP回复
         // ARP回复中：
@@ -150,67 +104,74 @@ SimpleRouter::processArpPacket(const Buffer& packet, const Interface *iface)
         // 源IP地址 --- ARP请求中的目的IP地址 == 接收到的路由器端口的IP地址
         // 目的MAC地址 --- ARP请求中的源MAC地址 == 以太网帧包头的源MAC地址
         // 目的IP地址 --- ARP请求中的源IP地址
-        if (pArp->arp_tip == iface->ip)
-        {
+        if (pArp->arp_tip == iface->ip){
             // 拷贝原请求包并修改相应字段
-            Buffer arpReplyPacket = packet;
-            auto *pReplyEthernet = (struct ethernet_hdr *)arpReplyPacket.data();
-            auto *pEthernet = (struct ethernet_hdr *)packet.data();
-            memcpy(pReplyEthernet->ether_dhost, pEthernet->ether_shost, ETHER_ADDR_LEN);
-            memcpy(pReplyEthernet->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
-
-            auto *pReplyArp = (struct arp_hdr *)(arpReplyPacket.data() + sizeof(struct ethernet_hdr));
-            pReplyArp->arp_op = htons(arp_op_reply);
-            memcpy(pReplyArp->arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
-            memcpy(pReplyArp->arp_tha, pArp->arp_sha, ETHER_ADDR_LEN);
-            pReplyArp->arp_sip = pArp->arp_tip;
-            pReplyArp->arp_tip = pArp->arp_sip;
-
-            sendPacket(packet, iface->name);
+            sendArpReply(packet, iface);
         }
-
     }
-    else if (ntohs(pArp->arp_op) == 2)
-    {
+    else if (pArp->arp_op == htons(arp_op_reply)){
         // 处理ARP回复
         // 若源IP地址在ARP缓存中没有对应的IP-MAC映射表项
         // 获取源IP地址和源Mac地址，作为新表项加入ARP缓存
-        uint32_t senderIp = pArp->arp_sip;
-
-        if (m_arp.lookup(senderIp) == nullptr)
-        {
-            Buffer senderMac;
-            for (unsigned char & i : pArp->arp_sha) {
-                senderMac.push_back(i);
-            }
-
-            auto arpRequest = m_arp.insertArpEntry(senderMac, senderIp);
-
-            // 处理相应ARP请求的待发送数据包并将其从队列中移除
-            if (arpRequest != nullptr)
-            {
-                for (const auto& arpPacket: arpRequest->packets)
-                {
-                    handlePacket(arpPacket.packet, arpPacket.iface);
-                }
-                m_arp.removeRequest(arpRequest);
-            }
-
-        }
-
+        processArpReply(packet);
     }
-    else
-    {
+    else{
         throw std::runtime_error("Neither arp request nor arp reply");
     }
-
 }
 
-//void
-//SimpleRouter::sendArpReply(const Buffer &packet, const Interface *iface)
-//{
+void
+SimpleRouter::sendArpReply(const Buffer &packet, const Interface *iface)
+{
+    std::cerr << "sendArpreply" << std::endl;
+
+    Buffer arpReplyPacket = packet;
+    auto *pReplyEthernet = (struct ethernet_hdr *)arpReplyPacket.data();
+    auto *pEthernet = (struct ethernet_hdr *)packet.data();
+    memcpy(pReplyEthernet->ether_dhost, pEthernet->ether_shost, ETHER_ADDR_LEN);
+    memcpy(pReplyEthernet->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
+
+    auto *pReplyArp = (struct arp_hdr *)(arpReplyPacket.data() + sizeof(struct ethernet_hdr));
+    auto *pArp = (struct arp_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
+    pReplyArp->arp_op = htons(arp_op_reply);
+    memcpy(pReplyArp->arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
+    memcpy(pReplyArp->arp_tha, pArp->arp_sha, ETHER_ADDR_LEN);
+    pReplyArp->arp_sip = pArp->arp_tip;
+    pReplyArp->arp_tip = pArp->arp_sip;
+
+//    print_hdr_eth((uint8_t*)pEthernet);
+//    print_hdr_eth((uint8_t*)pReplyEthernet);
 //
-//}
+//    print_hdr_arp((uint8_t*)pArp);
+//    print_hdr_arp((uint8_t*)pReplyArp);
+
+    sendPacket(arpReplyPacket, iface->name);
+}
+
+void
+SimpleRouter::processArpReply(const Buffer &packet)
+{
+    std::cerr << "processArpreply" << std::endl;
+    auto *pArp = (struct arp_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
+    uint32_t senderIp = pArp->arp_sip;
+
+    if (m_arp.lookup(senderIp) == nullptr){
+        Buffer senderMac;
+        for (unsigned char & i : pArp->arp_sha) {
+            senderMac.push_back(i);
+        }
+
+        auto arpRequest = m_arp.insertArpEntry(senderMac, senderIp);
+
+        // 处理相应ARP请求的待发送数据包并将其从队列中移除
+        if (arpRequest != nullptr){
+            for (const auto& arpPacket: arpRequest->packets){
+                handlePacket(arpPacket.packet, arpPacket.iface);
+            }
+            m_arp.removeRequest(arpRequest);
+        }
+    }
+}
 
 void
 SimpleRouter::processIpv4Packet(const Buffer& packet, const Interface *iface)
@@ -254,48 +215,8 @@ SimpleRouter::processIpv4Packet(const Buffer& packet, const Interface *iface)
             auto *pIcmp = (struct icmp_hdr *)(packet.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
             if (pIcmp->icmp_type == 8 && !pIcmp->icmp_code)
             {
-                auto routingEntry = m_routingTable.lookup(pIpv4->ip_src);
-                auto forwardInterface = findIfaceByName(routingEntry.ifName);
-
-                // 查询目的IP地址在ARP缓存中的对应MAC地址
-                auto arpEntry = m_arp.lookup(pIpv4->ip_dst);
-
-                // 若不存在，则加入请求队列
-                if (arpEntry == nullptr)
-                {
-                    // 注意：放进去的是接收端口的名字
-                    m_arp.queueRequest(pIpv4->ip_dst, packet, iface->name);
-                    return;
-                }
-
-                Buffer echoPacket = packet;
-                auto *pEchoEthernet = (struct ethernet_hdr *)echoPacket.data();
-                // auto *pEthernet = (struct ethernet_hdr *)packet.data();
-
-                memcpy(pEchoEthernet->ether_dhost, arpEntry->mac.data(), ETHER_ADDR_LEN);
-                memcpy(pEchoEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
-
-                auto *pEchoIpv4 = (struct ip_hdr *)(echoPacket.data() + sizeof(struct ethernet_hdr));
-                auto *pEchoIcmp = (struct icmp_hdr *)(echoPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
-
-                pEchoIpv4->ip_src = forwardInterface->ip;
-                pEchoIpv4->ip_dst = pIpv4->ip_src;
-
-                // 疑问：id和ttl的赋值规则
-                // ip_len是不变的 永远都是两包头的长度之和
-                pEchoIpv4->ip_id = 0;
-                pEchoIpv4->ip_ttl = 64;
-                pEchoIpv4->ip_sum = 0;
-                pEchoIpv4->ip_sum = cksum(pEchoIpv4, sizeof(struct ip_hdr));
-
-                pEchoIcmp->icmp_type = 0;
-                // 以防万一还是加上
-                pEchoIcmp->icmp_code = 0;
-                pEchoIcmp->icmp_sum = 0;
-                // 疑问：求校验码的时候长度为什么不是icmp_hdr的长度 (因为echo消息会带数据？)
-                pEchoIcmp->icmp_sum = cksum(pEchoIcmp, packet.size() - sizeof(struct ip_hdr) - sizeof(struct ethernet_hdr));
-
-                sendPacket(echoPacket, forwardInterface->name);
+                // 先查询路由表和ARP缓存，然后拷贝Echo数据包，修改相应字段并发送
+                sendIcmpEchoReply(packet, iface);
             }
         }
         else if (pIpv4->ip_p == ip_protocol_tcp || pIpv4->ip_p == ip_protocol_udp)
@@ -303,51 +224,7 @@ SimpleRouter::processIpv4Packet(const Buffer& packet, const Interface *iface)
             // 发送 unreachable的ICMP消息
             // TODO:检查ICMP数据包的大小、类型、校验码
 
-            auto routingEntry = m_routingTable.lookup(pIpv4->ip_src);
-            auto forwardInterface = findIfaceByName(routingEntry.ifName);
-
-            // 查询目的IP地址在ARP缓存中的对应MAC地址
-            auto arpEntry = m_arp.lookup(pIpv4->ip_dst);
-
-            // 若不存在，则加入请求队列
-            if (arpEntry == nullptr)
-            {
-                // 注意：放进去的是接收端口的名字
-                m_arp.queueRequest(pIpv4->ip_dst, packet, iface->name);
-                return;
-            }
-
-            Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
-            auto *pReplyEthernet = (struct ethernet_hdr *)replyPacket.data();
-            auto *pEthernet = (struct ethernet_hdr *)packet.data();
-
-            memcpy(pReplyEthernet, pEthernet, sizeof(struct ethernet_hdr));
-            memcpy(pReplyEthernet->ether_dhost, arpEntry->mac.data(), ETHER_ADDR_LEN);
-            memcpy(pReplyEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
-
-            auto *pReplyIpv4 = (struct ip_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr));
-            memcpy(pReplyIpv4, pIpv4, sizeof(struct ip_hdr));
-            pReplyIpv4->ip_src = forwardInterface->ip;
-            pReplyIpv4->ip_dst = pIpv4->ip_src;
-            pReplyIpv4->ip_id = 0;
-            pReplyIpv4->ip_ttl = 64;
-            pReplyIpv4->ip_p = ip_protocol_icmp;
-            pReplyIpv4->ip_len = sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr);
-            pReplyIpv4->ip_sum = 0;
-            pReplyIpv4->ip_sum = cksum(pReplyIpv4, sizeof(struct ip_hdr));
-
-            auto *pReplyIcmpT3 = (struct icmp_t3_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
-            pReplyIcmpT3->icmp_type = 3;
-            pReplyIcmpT3->icmp_code = 3;
-            pReplyIcmpT3->unused = 0;
-            // 疑问：这两个是什么
-            pReplyIcmpT3->next_mtu = 0;
-            memcpy(pReplyIcmpT3->data, pIpv4, ICMP_DATA_SIZE);
-
-            pReplyIcmpT3->icmp_sum = 0;
-            pReplyIcmpT3->icmp_sum = cksum(pReplyIcmpT3, sizeof(struct icmp_t3_hdr));
-
-            sendPacket(replyPacket, forwardInterface->name);
+            sendIcmpDestPortUnreachableReply(packet, iface);
         }
     }
     else
@@ -355,89 +232,251 @@ SimpleRouter::processIpv4Packet(const Buffer& packet, const Interface *iface)
         if (pIpv4->ip_ttl == 1)
         {
             // 发送超时ICMP消息
-            auto routingEntry = m_routingTable.lookup(pIpv4->ip_src);
-            auto forwardInterface = findIfaceByName(routingEntry.ifName);
-
-            // 查询目的IP地址在ARP缓存中的对应MAC地址
-            auto arpEntry = m_arp.lookup(pIpv4->ip_dst);
-
-            // 若不存在，则加入请求队列
-            if (arpEntry == nullptr)
-            {
-                // 注意：放进去的是接收端口的名字
-                m_arp.queueRequest(pIpv4->ip_dst, packet, iface->name);
-                return;
-            }
-
-            Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
-            auto *pReplyEthernet = (struct ethernet_hdr *)replyPacket.data();
-            auto *pEthernet = (struct ethernet_hdr *)packet.data();
-
-            memcpy(pReplyEthernet, pEthernet, sizeof(struct ethernet_hdr));
-            memcpy(pReplyEthernet->ether_dhost, arpEntry->mac.data(), ETHER_ADDR_LEN);
-            memcpy(pReplyEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
-
-            auto *pReplyIpv4 = (struct ip_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr));
-            memcpy(pReplyIpv4, pIpv4, sizeof(struct ip_hdr));
-            pReplyIpv4->ip_src = forwardInterface->ip;
-            pReplyIpv4->ip_dst = pIpv4->ip_src;
-            pReplyIpv4->ip_id = 0;
-            pReplyIpv4->ip_ttl = 64;
-            pReplyIpv4->ip_p = ip_protocol_icmp;
-            pReplyIpv4->ip_len = sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr);
-            pReplyIpv4->ip_sum = 0;
-            pReplyIpv4->ip_sum = cksum(pReplyIpv4, sizeof(struct ip_hdr));
-
-            auto *pReplyIcmpT3 = (struct icmp_t3_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
-            pReplyIcmpT3->icmp_type = 11;
-            pReplyIcmpT3->icmp_code = 0;
-            pReplyIcmpT3->unused = 0;
-            // 疑问：这两个是什么
-            pReplyIcmpT3->next_mtu = 0;
-            memcpy(pReplyIcmpT3->data, pIpv4, ICMP_DATA_SIZE);
-
-            pReplyIcmpT3->icmp_sum = 0;
-            pReplyIcmpT3->icmp_sum = cksum(pReplyIcmpT3, sizeof(struct icmp_t3_hdr));
-
-            sendPacket(replyPacket, forwardInterface->name);
-
+            sendIcmpTimeExceededReply(packet, iface);
             return;
         }
         else
         {
             // 从路由表中获取下一跳的IP地址 并进行转发
-
-            auto routingEntry = m_routingTable.lookup(pIpv4->ip_dst);
-            auto arp_entry = m_arp.lookup(routingEntry.dest);
-            if (arp_entry == nullptr)
-            {
-                m_arp.queueRequest(pIpv4->ip_dst, packet, iface->name);
-            }
-            else
-            {
-                // 在原有数据包的基础上修改
-                Buffer forwardPacket = packet;
-                auto *pForwardEthernet = (struct ethernet_hdr *)forwardPacket.data();
-                memcpy(pForwardEthernet->ether_dhost, arp_entry->mac.data(), ETHER_ADDR_LEN);
-
-                auto forwardInterface = findIfaceByIp(pIpv4->ip_dst);
-                memcpy(pForwardEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
-
-                auto *pForwardIpv4 = (struct ip_hdr *)(forwardPacket.data() + sizeof(struct ethernet_hdr));
-                pForwardIpv4->ip_ttl -= 1;
-                pForwardIpv4->ip_sum = 0;
-                pForwardIpv4->ip_sum = cksum(pForwardIpv4, sizeof(struct ip_hdr));
-
-                sendPacket(forwardPacket, routingEntry.ifName);
-            }
+            sendForwardingPacket(packet, iface);
         }
     }
 }
 
-//void
-//SimpleRouter::replyEchoIcmp(const Buffer &packet, const Interface *iface) {
+void
+SimpleRouter::sendIcmpEchoReply(const Buffer &packet, const Interface *iface) {
+    std::cerr << "sendIcmpEcho" << std::endl;
+    auto *pIpv4 = (struct ip_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
+
+    auto routingEntry = m_routingTable.lookup(pIpv4->ip_src);
+    auto forwardInterface = findIfaceByName(routingEntry.ifName);
+
+    // 查询目的IP地址在ARP缓存中的对应MAC地址
+    auto arpEntry = m_arp.lookup(pIpv4->ip_src);
+
+    // 若不存在，则加入请求队列
+    if (arpEntry == nullptr){
+        // 注意：放进去的是接收端口的名字
+        m_arp.queueRequest(pIpv4->ip_src, packet, iface->name);
+        return;
+    }
+
+    Buffer echoPacket = packet;
+    auto *pEchoEthernet = (struct ethernet_hdr *)echoPacket.data();
+
+    memcpy(pEchoEthernet->ether_dhost, arpEntry->mac.data(), ETHER_ADDR_LEN);
+    memcpy(pEchoEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
+
+    auto *pEchoIpv4 = (struct ip_hdr *)(echoPacket.data() + sizeof(struct ethernet_hdr));
+    auto *pEchoIcmp = (struct icmp_hdr *)(echoPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
+    auto *pIcmp = (struct icmp_hdr *)(packet.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
+
+
+    pEchoIpv4->ip_src = forwardInterface->ip;
+    pEchoIpv4->ip_dst = pIpv4->ip_src;
+
+    // 疑问：id和ttl的赋值规则
+    // ip_len是不变的 永远都是两包头的长度之和
+    pEchoIpv4->ip_id = 0;
+    pEchoIpv4->ip_ttl = 64;
+    pEchoIpv4->ip_sum = 0;
+    pEchoIpv4->ip_sum = cksum(pEchoIpv4, sizeof(struct ip_hdr));
+
+    pEchoIcmp->icmp_type = 0;
+    // 以防万一还是加上
+    pEchoIcmp->icmp_code = 0;
+    pEchoIcmp->icmp_sum = 0;
+    // 疑问：求校验码的时候长度为什么不是icmp_hdr的长度 (因为echo消息会带数据？)
+    pEchoIcmp->icmp_sum = cksum(pEchoIcmp, packet.size() - sizeof(struct ip_hdr) - sizeof(struct ethernet_hdr));
+
+    sendPacket(echoPacket, forwardInterface->name);
+}
+
+void
+SimpleRouter::sendIcmpDestPortUnreachableReply(const Buffer& packet, const Interface* iface)
+{
+    std::cerr << "sendIcmpPortUnreach" << std::endl;
+    auto *pIpv4 = (struct ip_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
+    auto routingEntry = m_routingTable.lookup(pIpv4->ip_src);
+    auto forwardInterface = findIfaceByName(routingEntry.ifName);
+
+    // 查询目的IP地址在ARP缓存中的对应MAC地址
+    auto arpEntry = m_arp.lookup(pIpv4->ip_src);
+
+    // 若不存在，则加入请求队列
+    if (arpEntry == nullptr)
+    {
+        // 注意：放进去的是接收端口的名字
+        m_arp.queueRequest(pIpv4->ip_src, packet, iface->name);
+        return;
+    }
+
+    Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
+    auto *pReplyEthernet = (struct ethernet_hdr *)replyPacket.data();
+    auto *pEthernet = (struct ethernet_hdr *)packet.data();
+
+    memcpy(pReplyEthernet, pEthernet, sizeof(struct ethernet_hdr));
+    memcpy(pReplyEthernet->ether_dhost, arpEntry->mac.data(), ETHER_ADDR_LEN);
+    memcpy(pReplyEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
+
+    auto *pReplyIpv4 = (struct ip_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr));
+    memcpy(pReplyIpv4, pIpv4, sizeof(struct ip_hdr));
+    pReplyIpv4->ip_src = forwardInterface->ip;
+    pReplyIpv4->ip_dst = pIpv4->ip_src;
+    pReplyIpv4->ip_id = 0;
+    pReplyIpv4->ip_ttl = 64;
+    pReplyIpv4->ip_p = ip_protocol_icmp;
+    pReplyIpv4->ip_len = htons(sizeof(struct icmp_t3_hdr) + sizeof(struct ip_hdr));
+    pReplyIpv4->ip_sum = 0;
+    pReplyIpv4->ip_sum = cksum(pReplyIpv4, sizeof(struct ip_hdr));
+
+    auto *pReplyIcmpT3 = (struct icmp_t3_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
+    pReplyIcmpT3->icmp_type = 3;
+    pReplyIcmpT3->icmp_code = 3;
+    pReplyIcmpT3->unused = 0;
+    // 疑问：这两个是什么
+    pReplyIcmpT3->next_mtu = 0;
+    memcpy(pReplyIcmpT3->data, pIpv4, ICMP_DATA_SIZE);
+
+    pReplyIcmpT3->icmp_sum = 0;
+    pReplyIcmpT3->icmp_sum = cksum(pReplyIcmpT3, sizeof(struct icmp_t3_hdr));
+
+//    print_hdr_eth((uint8_t*)pEthernet);
+//    print_hdr_ip((uint8_t*)pIpv4);
+//    print_hdr_eth((uint8_t*)pReplyEthernet);
+//    print_hdr_ip((uint8_t*)pReplyIpv4);
+//    print_hdr_icmp((uint8_t*)pReplyIcmpT3);
+
+
+    sendPacket(replyPacket, forwardInterface->name);
+}
+
+void
+SimpleRouter::sendIcmpTimeExceededReply(const Buffer& packet, const Interface* iface)
+{
+    std::cerr << "sendIcmpTimeExceed" << std::endl;
+    auto *pIpv4 = (struct ip_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
+
+    auto routingEntry = m_routingTable.lookup(pIpv4->ip_src);
+    auto forwardInterface = findIfaceByName(routingEntry.ifName);
+
+    // 查询目的IP地址在ARP缓存中的对应MAC地址
+    auto arpEntry = m_arp.lookup(pIpv4->ip_src);
+
+    // 若不存在，则加入请求队列
+    if (arpEntry == nullptr)
+    {
+        // 注意：放进去的是接收端口的名字
+        m_arp.queueRequest(pIpv4->ip_src, packet, iface->name);
+        return;
+    }
+
+    Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
+    auto *pReplyEthernet = (struct ethernet_hdr *)replyPacket.data();
+    auto *pEthernet = (struct ethernet_hdr *)packet.data();
+
+    memcpy(pReplyEthernet, pEthernet, sizeof(struct ethernet_hdr));
+    memcpy(pReplyEthernet->ether_dhost, arpEntry->mac.data(), ETHER_ADDR_LEN);
+    memcpy(pReplyEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
+
+    auto *pReplyIpv4 = (struct ip_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr));
+    memcpy(pReplyIpv4, pIpv4, sizeof(struct ip_hdr));
+    pReplyIpv4->ip_src = forwardInterface->ip;
+    pReplyIpv4->ip_dst = pIpv4->ip_src;
+    pReplyIpv4->ip_id = 0;
+    pReplyIpv4->ip_ttl = 64;
+    pReplyIpv4->ip_p = ip_protocol_icmp;
+    pReplyIpv4->ip_len = htons(sizeof(struct icmp_t3_hdr) + sizeof(struct ip_hdr));
+    pReplyIpv4->ip_sum = 0;
+    pReplyIpv4->ip_sum = cksum(pReplyIpv4, sizeof(struct ip_hdr));
+
+    auto *pReplyIcmpT3 = (struct icmp_t3_hdr *)(replyPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
+    pReplyIcmpT3->icmp_type = 11;
+    pReplyIcmpT3->icmp_code = 0;
+    pReplyIcmpT3->unused = 0;
+    // 疑问：这两个是什么
+    pReplyIcmpT3->next_mtu = 0;
+    memcpy(pReplyIcmpT3->data, pIpv4, ICMP_DATA_SIZE);
+
+    pReplyIcmpT3->icmp_sum = 0;
+    pReplyIcmpT3->icmp_sum = cksum(pReplyIcmpT3, sizeof(struct icmp_t3_hdr));
+
+    sendPacket(replyPacket, forwardInterface->name);
+}
+
+void
+SimpleRouter::sendForwardingPacket(const Buffer& packet, const Interface* iface)
+{
+    std::cerr << "forwardPacket" << std::endl;
+    auto *pIpv4 = (struct ip_hdr *)(packet.data() + sizeof(struct ethernet_hdr));
+
+    auto routingEntry = m_routingTable.lookup(pIpv4->ip_dst);
+    auto arp_entry = m_arp.lookup(pIpv4->ip_dst);
+    if (arp_entry == nullptr)
+    {
+        m_arp.queueRequest(pIpv4->ip_dst, packet, iface->name);
+        return;
+    }
+    else
+    {
+
+        // 在原有数据包的基础上修改
+        Buffer forwardPacket = packet;
+        auto *pForwardEthernet = (struct ethernet_hdr *)forwardPacket.data();
+        memcpy(pForwardEthernet->ether_dhost, arp_entry->mac.data(), ETHER_ADDR_LEN);
+
+        auto forwardInterface = findIfaceByName(routingEntry.ifName);
+        memcpy(pForwardEthernet->ether_shost, forwardInterface->addr.data(), ETHER_ADDR_LEN);
+
+        auto *pForwardIpv4 = (struct ip_hdr *)(forwardPacket.data() + sizeof(struct ethernet_hdr));
+        pForwardIpv4->ip_ttl -= 1;
+        pForwardIpv4->ip_sum = 0;
+        pForwardIpv4->ip_sum = cksum(pForwardIpv4, sizeof(struct ip_hdr));
+
+//        auto *pEthernet = (struct ethernet_hdr *)packet.data();
+//        print_hdr_eth((uint8_t*)pEthernet);
+//        print_hdr_ip((uint8_t*)pIpv4);
 //
-//}
+//        print_hdr_eth((uint8_t*)pForwardEthernet);
+//        print_hdr_ip((uint8_t*)pForwardIpv4);
+
+        sendPacket(forwardPacket, routingEntry.ifName);
+    }
+}
+
+void
+SimpleRouter::sendArpRequest(uint32_t ip)
+{
+    std::cerr << "sendArpRequest" << std::endl;
+    Buffer arpRequest = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct arp_hdr)));
+    auto *pReplyEthernet = (struct ethernet_hdr*)(arpRequest.data());
+    const auto routing_entry = m_routingTable.lookup(ip);
+    auto *interface = findIfaceByName(routing_entry.ifName);
+    memcpy(pReplyEthernet->ether_shost, interface->addr.data(), ETHER_ADDR_LEN);
+    for(unsigned char & i : pReplyEthernet->ether_dhost)
+    {
+        i = 0xff;
+    }
+    pReplyEthernet->ether_type = htons(ethertype_arp);
+
+    auto *pReplyArp = (struct arp_hdr*)(arpRequest.data() + sizeof(struct ethernet_hdr));
+    pReplyArp->arp_sip = interface->ip;
+    pReplyArp->arp_tip = ip;
+    memcpy(pReplyArp->arp_sha, interface->addr.data(), ETHER_ADDR_LEN);
+    for(unsigned char & i : pReplyArp->arp_tha)
+    {
+        i = 0x00;
+    }
+    pReplyArp->arp_hrd = htons(arp_hrd_ethernet);
+    pReplyArp->arp_pro = htons(ethertype_ip);
+    pReplyArp->arp_op = htons(arp_op_request);
+    pReplyArp->arp_hln = 0x06;
+    pReplyArp->arp_pln = 0x04;
+
+
+    sendPacket(arpRequest, interface->name);
+
+}
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////

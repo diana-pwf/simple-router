@@ -61,7 +61,7 @@ RoutingTable::lookup(uint32_t ip) const
             }
         }
     }
-    if(commonPrefixMaxLen == -1)
+    if(commonPrefixMaxLen != -1)
     {
         return *entry;
     }

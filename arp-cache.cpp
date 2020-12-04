@@ -74,24 +74,29 @@ ArpCache::handleArpRequest(std::shared_ptr<ArpRequest>& request)
         {
             for(auto packet: request->packets)
             {
+                std::cerr << "sendIcmpDestUnreach" << std::endl;
                 // 发送destination host unreachable的ICMP消息
                 Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
                 auto *pReplyEthernet = (struct ethernet_hdr*)replyPacket.data();
                 auto *pEthernet = (struct ethernet_hdr*)packet.packet.data();
                 memcpy(pReplyEthernet, pEthernet, sizeof(struct ethernet_hdr));
+
+                auto *pIpv4 = (struct ip_hdr*)(packet.packet.data() + sizeof(struct ethernet_hdr));
                 memcpy(pReplyEthernet->ether_dhost, pEthernet->ether_shost, ETHER_ADDR_LEN);
+
                 auto *interface = m_router.findIfaceByName(packet.iface);
                 memcpy(pReplyEthernet->ether_shost, interface->addr.data(), ETHER_ADDR_LEN);
-                pReplyEthernet->ether_type = ethertype_ip;
+                pReplyEthernet->ether_type = htons(ethertype_ip);
 
                 auto *pReplyIpv4 = (struct ip_hdr*)(replyPacket.data() + sizeof(struct ethernet_hdr));
-                auto *pIpv4 = (struct ip_hdr*)(packet.packet.data() + sizeof(struct ethernet_hdr));
+
                 memcpy(pReplyIpv4, pIpv4, sizeof(struct ip_hdr));
                 pReplyIpv4->ip_dst = pIpv4->ip_src;
                 pReplyIpv4->ip_src = interface->ip;
                 pReplyIpv4->ip_p = ip_protocol_icmp;
                 pReplyIpv4->ip_id = 0;
                 pReplyIpv4->ip_ttl = 64;
+
                 // 疑问：长度这里为什么要进行转换
                 pReplyIpv4->ip_len = htons(sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr));
                 pReplyIpv4->ip_sum = 0;
@@ -113,33 +118,7 @@ ArpCache::handleArpRequest(std::shared_ptr<ArpRequest>& request)
         else
         {
             // 调用m_router的函数发送arp request请求
-            Buffer arpRequest = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct arp_hdr)));
-            auto *pReplyEthernet = (struct ethernet_hdr*)(arpRequest.data());
-
-            const auto routing_entry = m_router.m_routingTable.lookup(request->ip);
-            auto *interface = m_router.findIfaceByName(routing_entry.ifName);
-            memcpy(pReplyEthernet->ether_shost, interface->addr.data(), ETHER_ADDR_LEN);
-            for(unsigned char & i : pReplyEthernet->ether_dhost)
-            {
-                i = 0xff;
-            }
-            pReplyEthernet->ether_type = ethertype_arp;
-
-            auto *pReplyArp = (struct arp_hdr*)(arpRequest.data() + sizeof(struct ethernet_hdr));
-            pReplyArp->arp_sip = interface->ip;
-            pReplyArp->arp_tip = request->ip;
-            memcpy(pReplyArp->arp_sha, interface->addr.data(), ETHER_ADDR_LEN);
-            for(unsigned char & i : pReplyArp->arp_tha)
-            {
-                i = 0xff;
-            }
-            pReplyArp->arp_hrd = htons(arp_hrd_ethernet);
-            pReplyArp->arp_pro = htons(ethertype_ip);
-            pReplyArp->arp_op = htons(arp_op_request);
-            pReplyArp->arp_hln = 0x06;
-            pReplyArp->arp_pln = 0x04;
-            m_router.sendPacket(arpRequest, routing_entry.ifName);
-
+            m_router.sendArpRequest(request->ip);
             request->timeSent = now;
             request->nTimesSent += 1;
         }
