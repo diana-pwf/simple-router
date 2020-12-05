@@ -335,14 +335,14 @@ SimpleRouter::sendIcmpDestHostUnreachableReply(const Buffer& packet, const std::
     auto routingEntry = getRoutingTable().lookup(pIpv4->ip_src);
     auto interface = findIfaceByName(routingEntry.ifName);
     // 查询目的IP地址在ARP缓存中的对应MAC地址
-    auto arpEntry = m_arp.lookup(pIpv4->ip_src);
-    // 若不存在，则加入请求队列
-    if (arpEntry == nullptr)
-    {
-        // 注意：放进去的是接收端口的名字
-        m_arp.queueRequest(pIpv4->ip_src, packet, iface);
-        return;
-    }
+//    auto arpEntry = m_arp.lookup(pIpv4->ip_src);
+//    // 若不存在，则加入请求队列
+//    if (arpEntry == nullptr)
+//    {
+//        // 注意：放进去的是接收端口的名字
+//        m_arp.queueRequest(pIpv4->ip_src, packet, iface);
+//        return;
+//    }
 
     Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
     auto *pReplyEthernet = (struct ethernet_hdr*)replyPacket.data();
