@@ -31,9 +31,8 @@ namespace simple_router {
 RoutingTableEntry
 RoutingTable::lookup(uint32_t ip) const
 {
-    // 最长前缀匹配算法 [有问题] -- 要求匹配qwq
+    // 最长前缀匹配算法
     // 返回匹配的路由表项
-
     int commonPrefixMaxLen = -1;
     auto *entry = new RoutingTableEntry;
     entry->ifName = "";

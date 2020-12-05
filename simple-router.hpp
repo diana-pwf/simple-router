@@ -50,19 +50,20 @@ public:
   void
   sendArpReply(const Buffer& packet, const Interface* iface);
 
-  // 获取源IP地址和源Mac地址，若无查找结果，作为新表项加入ARP缓存，并处理相应队列请求
   void
   processArpReply(const Buffer& packet);
 
   void
   processIpv4Packet(const Buffer& packet, const Interface* iface);
 
-  // 查询路由表和ARP缓存，拷贝Echo数据包，修改相应字段并发送
   void
   sendIcmpEchoReply(const Buffer& packet, const Interface* iface);
 
   void
   sendIcmpDestPortUnreachableReply(const Buffer& packet, const Interface* iface);
+
+  void
+  sendIcmpDestHostUnreachableReply(const Buffer& packet, const std::string& outIface);
 
   void
   sendIcmpTimeExceededReply(const Buffer& packet, const Interface* iface);
@@ -135,11 +136,11 @@ public:
   const Interface*
   findIfaceByName(const std::string& name) const;
 
-  RoutingTable m_routingTable;
+
 
 private:
   ArpCache m_arp;
-
+  RoutingTable m_routingTable;
   std::set<Interface> m_ifaces;
   std::map<std::string, uint32_t> m_ifNameToIpMap;
 

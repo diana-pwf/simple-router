@@ -1,4 +1,4 @@
-/usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /router
--- Configuring done
--- Generating done
--- Build files have been written to: /router/cmake-build-debug-vm
+CMake executable not found: /usr/bin/cmake Configure
+
+Cannot get compiler information:
+	Unable to create temporary file

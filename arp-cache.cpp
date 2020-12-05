@@ -74,50 +74,11 @@ ArpCache::handleArpRequest(std::shared_ptr<ArpRequest>& request)
         {
             for(auto packet: request->packets)
             {
-                std::cerr << "sendIcmpDestUnreach" << std::endl;
-                // 发送destination host unreachable的ICMP消息
-                Buffer replyPacket = *(new Buffer(sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr)));
-                auto *pReplyEthernet = (struct ethernet_hdr*)replyPacket.data();
-                auto *pEthernet = (struct ethernet_hdr*)packet.packet.data();
-                memcpy(pReplyEthernet, pEthernet, sizeof(struct ethernet_hdr));
-
-                auto *pIpv4 = (struct ip_hdr*)(packet.packet.data() + sizeof(struct ethernet_hdr));
-                memcpy(pReplyEthernet->ether_dhost, pEthernet->ether_shost, ETHER_ADDR_LEN);
-
-                auto *interface = m_router.findIfaceByName(packet.iface);
-                memcpy(pReplyEthernet->ether_shost, interface->addr.data(), ETHER_ADDR_LEN);
-                pReplyEthernet->ether_type = htons(ethertype_ip);
-
-                auto *pReplyIpv4 = (struct ip_hdr*)(replyPacket.data() + sizeof(struct ethernet_hdr));
-
-                memcpy(pReplyIpv4, pIpv4, sizeof(struct ip_hdr));
-                pReplyIpv4->ip_dst = pIpv4->ip_src;
-                pReplyIpv4->ip_src = interface->ip;
-                pReplyIpv4->ip_p = ip_protocol_icmp;
-                pReplyIpv4->ip_id = 0;
-                pReplyIpv4->ip_ttl = 64;
-
-                // 疑问：长度这里为什么要进行转换
-                pReplyIpv4->ip_len = htons(sizeof(struct ip_hdr) + sizeof(struct icmp_t3_hdr));
-                pReplyIpv4->ip_sum = 0;
-                pReplyIpv4->ip_sum = cksum(pReplyIpv4, sizeof(struct ip_hdr));
-
-                auto *pReplyIcmpT3 = (struct icmp_t3_hdr*)(replyPacket.data() + sizeof(struct ethernet_hdr) + sizeof(struct ip_hdr));
-                pReplyIcmpT3->icmp_type = 3;
-                pReplyIcmpT3->icmp_code = 1;
-                pReplyIcmpT3->unused = 0;
-                // 疑问：下面两行是为啥
-                pReplyIcmpT3->next_mtu = 0;
-                memcpy(pReplyIcmpT3->data, pIpv4, ICMP_DATA_SIZE);
-                pReplyIcmpT3->icmp_sum = 0;
-                pReplyIcmpT3->icmp_sum = cksum(pReplyIcmpT3, sizeof(struct icmp_t3_hdr));
-
-                m_router.sendPacket(replyPacket, interface->name);
+                m_router.sendIcmpDestHostUnreachableReply(packet.packet, packet.iface);
             }
         }
         else
         {
-            // 调用m_router的函数发送arp request请求
             m_router.sendArpRequest(request->ip);
             request->timeSent = now;
             request->nTimesSent += 1;
